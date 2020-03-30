@@ -1,0 +1,287 @@
+import groovy.json.JsonBuilder
+
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-android-extensions'
+
+
+
+android {
+    compileSdkVersion 29
+    buildToolsVersion "29.0.3"
+
+    defaultConfig {
+        applicationId "me.sunbird.easy_package"
+        minSdkVersion 21
+        targetSdkVersion 29
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+}
+
+task uploadPgyerByApi() {
+    doLast {
+        //编辑完成后
+        def file_path = "./build/outputs/apk/release/app-release-unsigned.apk"
+        //apk上传api url
+        def api_url = "http://www.pgyer.com/apiv2/app/upload"
+        //用户api_key 可从蒲公英后台获取
+        def api_key = "1540c89d7f12ade530a14ac4adf9caa2"
+        //用户user_key 可从蒲公英后台获取
+        def user_key = "15391e4e9f1d62962b97ff630d68f0b6"
+        MultipartUtility utility = new MultipartUtility(api_url, "UTF-8")
+
+        utility.addFormField("_api_key", api_key)
+        utility.addFormField("userKey", user_key)
+        utility.addFormField("buildInstallType", "2")
+        utility.addFormField("buildPassword", "123456")
+        utility.addFormField("buildUpdateDescription", "serverName")
+        utility.addFilePart("file", file(file_path))
+
+        def result = utility.finish()
+        println result
+    }
+}
+
+
+task publishTestRelease() {
+    group "publish"
+}
+
+task publishPreRelease() {
+    group "publish"
+}
+
+task publishCloseBetaRelease() {
+    group "publish"
+}
+
+task publishReleaseRelease(dependsOn: "assembleRelease") {
+    group "publish"
+
+    doFirst {
+        println "publishReleaseRelease doFirst called......"
+    }
+    doLast {
+        println "publishReleaseRelease doLast called......"
+    }
+
+    finalizedBy(uploadPgyerByApi)
+}
+
+task printHelloWorld() {
+    group "test"
+    description "this task just print hello world!"
+    doFirst {
+        println "Hello world!"
+    }
+}
+
+
+task sendWeChatMessage(){
+    doLast{
+        def robotUrl = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bece9001-ab3e-44f2-913e-5560a9633de2"
+
+        def markdownText = """
+#### 一个新的测试包已经上传
+"""
+        def builder = new JsonBuilder({
+            msgtype "markdown"
+            markdown {
+                content markdownText
+            }
+        })
+
+
+        URL url = new URL(robotUrl)
+        URLConnection connection = url.openConnection()
+        connection.setDoInput(true)
+        connection.setDoOutput(true)
+        connection.setUseCaches(false)
+        connection.setRequestMethod("POST")
+        connection.setRequestProperty("Content-Type", "application/json")
+
+        connection.connect()
+
+        OutputStream outStream = connection.getOutputStream()
+
+        outStream.write(builder.toString().getBytes())
+
+        InputStream inStream = connection.getInputStream()
+
+        Scanner scanner = new Scanner(inStream)
+
+        while (scanner.hasNextLine()) {
+            println scanner.nextLine()
+        }
+        outStream.close()
+        inStream.close()
+    }
+}
+
+uploadPgyerByApi.finalizedBy(sendWeChatMessage)
+
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    implementation 'androidx.appcompat:appcompat:1.1.0'
+    implementation 'androidx.core:core-ktx:1.2.0'
+    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
+    testImplementation 'junit:junit:4.12'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
+}
+
+
+class MultipartUtility {
+
+    private final String boundary = UUID.randomUUID().toString()
+    private static final String LINE_FEED = "\r\n"
+    private HttpURLConnection httpConn
+    private String charset
+    private OutputStream outputStream
+    private PrintWriter writer
+
+    /**
+     * This constructor initializes a new HTTP POST request with content type
+     * is set to multipart/form-data
+     *
+     * @param requestURL
+     * @param charset
+     * @throws IOException
+     */
+    MultipartUtility(String requestURL, String charset)
+            throws IOException {
+        this.charset = charset
+
+        URL url = new URL(requestURL)
+//        Log.e("URL", "URL : " + requestURL.toString());
+        println "URL : " + requestURL.toString()
+
+        httpConn = (HttpURLConnection) url.openConnection()
+
+//        httpConn = url.openConnection(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(8888)))
+
+
+        httpConn.setRequestMethod("POST")
+        httpConn.setUseCaches(false)
+        httpConn.setDoOutput(true) // indicates POST method
+        httpConn.setDoInput(true)
+        httpConn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary)
+//        httpConn.setRequestProperty("User-Agent", "CodeJava Agent")
+//        httpConn.setRequestProperty("Test", "Bonjour")
+        outputStream = httpConn.getOutputStream()
+        writer = new PrintWriter(new OutputStreamWriter(outputStream, charset), true)
+    }
+
+    /**
+     * Adds a form field to the request
+     *
+     * @param name field name
+     * @param value field value
+     */
+    void addFormField(String name, String value) {
+        writer.append("--" + boundary).append(LINE_FEED)
+        writer.append("Content-Disposition: form-data; name=\"" + name + "\"")
+                .append(LINE_FEED)
+        writer.append("Content-Type: text/plain; charset=" + charset).append(
+                LINE_FEED)
+        writer.append(LINE_FEED)
+        writer.append(value).append(LINE_FEED)
+        writer.flush()
+    }
+
+    /**
+     * Adds a upload file section to the request
+     *
+     * @param fieldName name attribute in <input type="file" name="..." />
+     * @param uploadFile a File to be uploaded
+     * @throws IOException
+     */
+    void addFilePart(String fieldName, File uploadFile)
+            throws IOException {
+        String fileName = uploadFile.getName()
+        writer.append("--" + boundary).append(LINE_FEED)
+        writer.append(
+                "Content-Disposition: form-data; name=\"" + fieldName + "\"; filename=\"" + fileName + "\"")
+                .append(LINE_FEED)
+        writer.append("Content-Type: " + "application/vnd.android.package-archive")
+                .append(LINE_FEED)
+        writer.append("Content-Transfer-Encoding: binary")
+                .append(LINE_FEED)
+        writer.append(LINE_FEED)
+        writer.flush()
+
+        FileInputStream inputStream = new FileInputStream(uploadFile)
+
+        byte[] buffer = new byte[1024 * 6]
+        int bytesRead = -1
+        int countBytes = 0
+        while ((bytesRead = inputStream.read(buffer)) != -1) {
+            outputStream.write(buffer, 0, bytesRead)
+            outputStream.flush()
+            countBytes += bytesRead
+        }
+
+        println "countBytes:${countBytes}"
+
+
+        inputStream.close()
+//        writer.append(LINE_FEED)
+        writer.flush()
+    }
+
+    /**
+     * Adds a header field to the request.
+     *
+     * @param name - name of the header field
+     * @param value - value of the header field
+     */
+    void addHeaderField(String name, String value) {
+        writer.append(name + ": " + value).append(LINE_FEED)
+        writer.flush()
+    }
+
+    /**
+     * Completes the request and receives response from the server.
+     *
+     * @return a list of Strings as response in case the server returned
+     * status OK, otherwise an exception is thrown.
+     * @throws IOException
+     */
+    String finish() throws IOException {
+        StringBuffer response = new StringBuffer()
+
+        writer.append(LINE_FEED).flush()
+        writer.append("--" + boundary + "--").append(LINE_FEED)
+        writer.close()
+
+        // checks server's status code first
+        int status = httpConn.getResponseCode()
+        if (status == HttpURLConnection.HTTP_OK) {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(
+                    httpConn.getInputStream()))
+            String line = null
+            while ((line = reader.readLine()) != null) {
+                response.append(line)
+            }
+            reader.close()
+            httpConn.disconnect()
+        } else {
+            throw new IOException("Server returned non-OK status: " + status)
+        }
+
+        return response.toString()
+    }
+}

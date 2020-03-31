@@ -5,6 +5,7 @@ apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-android-extensions'
 
 
+def serverName = "默认服务器"
 
 android {
     compileSdkVersion 29
@@ -45,7 +46,7 @@ task uploadPgyerByApi() {
         utility.addFormField("userKey", user_key)
         utility.addFormField("buildInstallType", "2")
         utility.addFormField("buildPassword", "123456")
-        utility.addFormField("buildUpdateDescription", "serverName")
+        utility.addFormField("buildUpdateDescription", serverName)
         utility.addFilePart("file", file(file_path))
 
         def result = utility.finish()
@@ -74,6 +75,8 @@ task publishReleaseRelease(dependsOn: "assembleRelease") {
     }
     doLast {
         println "publishReleaseRelease doLast called......"
+//        project.setProperty("serverName", "线上服务器")
+        serverName = "线上服务器"
     }
 
     finalizedBy(uploadPgyerByApi)
@@ -88,12 +91,24 @@ task printHelloWorld() {
 }
 
 
-task sendWeChatMessage(){
-    doLast{
+task sendWeChatMessage() {
+    doLast {
         def robotUrl = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bece9001-ab3e-44f2-913e-5560a9633de2"
 
         def markdownText = """
-#### 一个新的测试包已经上传
+
+# 一个新的测试包已经上传 
+
+ > - versionName: ${android.defaultConfig.versionName}
+ 
+ > - versionCode: ${android.defaultConfig.versionCode}
+
+ > - 服务器: ${serverName}
+
+ > - 密码: 123456
+
+ > - 下载地址: [https://www.pgyer.com/KIqO](https://www.pgyer.com/KIqO)
+
 """
         def builder = new JsonBuilder({
             msgtype "markdown"

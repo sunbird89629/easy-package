@@ -30,6 +30,12 @@ android {
 
 }
 
+def startTime = System.currentTimeMillis()
+def endTime = System.currentTimeMillis()
+gradle.taskGraph.whenReady {
+    startTime = System.currentTimeMillis()
+}
+
 task uploadPgyerByApi() {
     doLast {
         //编辑完成后
@@ -46,7 +52,15 @@ task uploadPgyerByApi() {
         utility.addFormField("userKey", user_key)
         utility.addFormField("buildInstallType", "2")
         utility.addFormField("buildPassword", "123456")
-        utility.addFormField("buildUpdateDescription", serverName)
+
+        def description = """
+线上服务器
+
+
+构建耗时：${(endTime - startTime) / 1000}s
+"""
+
+        utility.addFormField("buildUpdateDescription", description)
         utility.addFilePart("file", file(file_path))
 
         def result = utility.finish()
@@ -69,13 +83,14 @@ task publishCloseBetaRelease() {
 
 task publishReleaseRelease(dependsOn: "assembleRelease") {
     group "publish"
-
     doFirst {
-        println "publishReleaseRelease doFirst called......"
+        endTime = System.currentTimeMillis()
+//        println "publishReleaseRelease doFirst called......"
     }
     doLast {
-        println "publishReleaseRelease doLast called......"
+//        println "publishReleaseRelease doLast called......"
 //        project.setProperty("serverName", "线上服务器")
+        println "build time is: ${endTime - startTime}"
         serverName = "线上服务器"
     }
 
